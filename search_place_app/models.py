@@ -1,7 +1,12 @@
-from sqlalchemy import VARCHAR, Boolean, ForeignKey, Integer
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from .database import Base, int_pk, str_null_true, str_uniq
-from sqlalchemy import UniqueConstraint
+import sys
+from pathlib import Path
+from sqlalchemy import VARCHAR, Boolean, ForeignKey, Integer, UniqueConstraint
+from sqlalchemy.orm import Mapped, mapped_column, relationship, declarative_base
+
+# Добавляем корень проекта в PYTHONPATH
+sys.path.append(str(Path(__file__).parent.parent))
+
+from search_place_app.database import Base, int_pk, str_null_true, str_uniq
 
 
 class User(Base):
@@ -13,6 +18,7 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     places = relationship("Place", secondary="user_place", back_populates="users", lazy="selectin")
     categories = relationship("Category", secondary="user_category", back_populates="users", lazy="selectin")
+    hotels = relationship("Hotel", secondary="user_hotel", back_populates="users", lazy="selectin")
 
     @property
     def dict(self):
@@ -66,4 +72,26 @@ class UserCategory(Base):
 
     __table_args__ = (
         UniqueConstraint("user_id", "category_id", name="uq_user_category"),
+    )
+
+class Hotel(Base):
+    __tablename__ = "hotel"
+    id: Mapped[int_pk]
+    name: Mapped[str_null_true] = mapped_column(VARCHAR(255), nullable=False)
+    address: Mapped[str_null_true] = mapped_column(VARCHAR(255), nullable=True)
+    users = relationship("User", secondary="user_hotel", back_populates="hotels", lazy="selectin")
+
+    __table_args__ = (
+        UniqueConstraint("name", name="uq_hotel_name"),
+    )
+
+class UserHotel(Base):
+    __tablename__ = "user_hotel"
+    id: Mapped[int_pk]
+    user_id: Mapped[int] = mapped_column(ForeignKey("user.id"), nullable=False)
+    hotel_id: Mapped[int] = mapped_column(ForeignKey("hotel.id"), nullable=False)
+    weight: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "hotel_id", name="uq_user_hotel"),
     )

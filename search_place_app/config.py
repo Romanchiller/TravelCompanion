@@ -1,5 +1,10 @@
 import os
+import sys
+from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Добавляем корень проекта в PYTHONPATH
+sys.path.append(str(Path(__file__).parent.parent))
 
 
 class Settings(BaseSettings):
@@ -15,6 +20,13 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 300
     MAX_CONCURRENT_PLACES: int = 10
+    CACHE_ENABLED: bool
+    MEMCACHED_HOST: str
+    MEMCACHED_PORT: int
+    CACHE_DEFAULT_TTL: int
+    ENV_TYPE: str
+    AMADEUS_CLIENT_ID: str
+    AMADEUS_CLIENT_SECRET: str
     model_config = SettingsConfigDict(
         env_file=os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env")
     )

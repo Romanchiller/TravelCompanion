@@ -12,17 +12,31 @@ from sqlalchemy.exc import IntegrityError
 
 
 class PlaceService:
-    def __init__(self, db: AsyncSession, client: AsyncClient):
+    def __init__(self, db: AsyncSession, client: AsyncClient, cache):
         self.db = db
         self.client = client
+        self.cache = cache
+        self.cache_enabled = settings.CACHE_ENABLED
+
 
     async def fetch_places(self, url: str, headers: dict, query: str) -> list[dict]:
+        cache_key = f"places_{query}"
+        if self.cache_enabled:
+            cached_data = await self.cache.get(cache_key)
+            if cached_data:
+                return cached_data
         params = {"query": query}
         response = await self.client.get(url, headers=headers, params=params)
         if response.status_code != 200:
             raise HTTPException(status_code=response.status_code, detail="Failed to fetch places")
         data = response.json() or {}
-        results = data.get("results")
+        results = data.get("results", [])
+        if self.cache_enabled and results:
+            await self.cache.set(
+                cache_key,
+                results,
+                ttl=settings.CACHE_DEFAULT_TTL
+            )
         return results if isinstance(results, list) else []
 
     def validate_price_bounds(self, min_price: Optional[int], max_price: Optional[int]) -> None:
@@ -176,6 +190,9 @@ class PlaceService:
         semaphore = asyncio.Semaphore(settings.MAX_CONCURRENT_PLACES)
         tasks = [self._process_single(item, user_id, semaphore) for item in items]
         await asyncio.gather(*tasks)
+        if user_id and self.cache_enabled:
+            await self.cache.delete(f"user:{user_id}:favorites")
+
 
     async def _process_single(self, item: dict, user_id: Optional[int], semaphore: asyncio.Semaphore) -> None:
         async with semaphore:

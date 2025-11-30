@@ -41,3 +41,29 @@ class AuthService:
         if not self.verify_password(password, user.password):
             return False
         return user
+        
+    async def login_for_access_token(self, username: str, password: str):
+        """
+        Аутентификация пользователя и получение JWT токена.
+        
+        Args:
+            username: Email пользователя
+            password: Пароль
+            
+        Returns:
+            Словарь с access_token и token_type
+            
+        Raises:
+            HTTPException: Если аутентификация не удалась
+        """
+        user = await self.authenticate_user(username, password)
+        if not user:
+            raise ValueError("Неверный email или пароль")
+            
+        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = self.create_access_token(
+            data={"sub": user.email}, 
+            expires_delta=access_token_expires
+        )
+        
+        return {"access_token": access_token, "token_type": "bearer"}

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, ConfigDict, field_validator, model_validator
-from typing import Optional, Type
+from typing import Optional, Type, List
 
 
 class AbstractUser(BaseModel):
@@ -91,8 +91,104 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     email: EmailStr | None = None
 
+
+class UserResponse(BaseModel):
+    """Схема для ответа с данными пользователя."""
+    id: int
+    name: str
+    email: EmailStr
+    is_active: bool = True
+    
+    model_config = ConfigDict(from_attributes=True)
+
 class UserPublic(BaseModel):
     id: int
     name: str
     email: EmailStr
+    
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PlaceBase(BaseModel):
+    """Базовая схема для места."""
+    name: str
+    address: Optional[str] = None
+
+
+class PlaceCreate(PlaceBase):
+    """Схема для создания места."""
+    pass
+
+
+class PlaceUpdate(PlaceBase):
+    """Схема для обновления места."""
+    name: Optional[str] = None
+    address: Optional[str] = None
+
+
+class Place(PlaceBase):
+    """Схема для отображения места."""
+    id: int
+    categories: List['Category'] = []
+    users: List['UserPublic'] = []
+    
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PlaceInDB(Place):
+    """Схема для хранения места в базе данных."""
+    pass
+
+
+class CategoryBase(BaseModel):
+    """Базовая схема для категории."""
+    name: str
+
+
+class Category(BaseModel):
+    """Схема для отображения категории."""
+    id: int
+    model_config = ConfigDict(from_attributes=True)
+
+
+class HotelBase(BaseModel):
+    """Базовая схема для отеля."""
+    name: str
+    address: Optional[str] = None
+    city: Optional[str] = None
+    country_code: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    rating: Optional[float] = None
+    price: Optional[float] = None
+    currency: Optional[str] = None
+
+
+class HotelCreate(HotelBase):
+    """Схема для создания отеля."""
+    pass
+
+
+class HotelUpdate(BaseModel):
+    """Схема для обновления отеля."""
+    name: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    country_code: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    rating: Optional[float] = None
+    price: Optional[float] = None
+    currency: Optional[str] = None
+
+
+class Hotel(HotelBase):
+    """Схема для отображения отеля."""
+    id: int
+    model_config = ConfigDict(from_attributes=True)
+
+
+class HotelInDB(HotelBase):
+    """Схема для хранения отеля в базе данных."""
+    id: int
     model_config = ConfigDict(from_attributes=True)

@@ -1,9 +1,16 @@
-from .config import settings, get_db_url
+import sys
+from pathlib import Path
 from typing import Annotated
+from datetime import datetime
+
 from sqlalchemy.orm import DeclarativeBase, declared_attr, mapped_column, Mapped
 from sqlalchemy.sql import func
-from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncAttrs, create_async_engine, async_sessionmaker
+
+# Добавляем корень проекта в PYTHONPATH
+sys.path.append(str(Path(__file__).parent.parent))
+
+from search_place_app.config import settings, get_db_url
 
 
 
