@@ -19,6 +19,7 @@ class User(Base):
     places = relationship("Place", secondary="user_place", back_populates="users", lazy="selectin")
     categories = relationship("Category", secondary="user_category", back_populates="users", lazy="selectin")
     hotels = relationship("Hotel", secondary="user_hotel", back_populates="users", lazy="selectin")
+    travel = relationship()
 
     @property
     def dict(self):
@@ -95,3 +96,23 @@ class UserHotel(Base):
     __table_args__ = (
         UniqueConstraint("user_id", "hotel_id", name="uq_user_hotel"),
     )
+
+class Travel(Base):
+    __tablename__ = "travel"
+    id: Mapped[int_pk]
+    place = relationship("Place", secondary="place_travel", back_populates="travels")
+    hotels = relationship("Hotel", secondary="user_hotel", back_populates="travels")
+    user_id: Mapped[int] = ForeignKey("user.id")
+
+
+class PlaceTravel(Base):
+    __tablename__ = "place_travel"
+    id : Mapped[int_pk]
+    user_id : Mapped[int] = mapped_column(ForeignKey("user.id"), nullable=False)
+    place_id : Mapped[int] = mapped_column(ForeignKey("place.id"), nullable=False)
+
+class HotelTravel(Base):
+    __tablename__ = "user_travel"
+    id: Mapped[int_pk]
+    user_id : Mapped[int] = mapped_column(ForeignKey("user.id"), nullable=False)
+    hotel_id : Mapped[int] = mapped_column(ForeignKey("hotel.id"), nullable=False)

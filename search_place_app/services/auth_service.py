@@ -33,8 +33,8 @@ class AuthService:
         encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
         return encoded_jwt
 
-    async def authenticate_user(self, username: str, password: str):
-        result = await self.db.execute(select(User).where(User.email == username))
+    async def authenticate_user(self, email: str, password: str):
+        result = await self.db.execute(select(User).where(User.email == email))
         user = result.scalar_one_or_none()
         if not user:
             return False
@@ -42,7 +42,7 @@ class AuthService:
             return False
         return user
         
-    async def login_for_access_token(self, username: str, password: str):
+    async def login_for_access_token(self, email: str, password: str):
         """
         Аутентификация пользователя и получение JWT токена.
         
@@ -56,7 +56,7 @@ class AuthService:
         Raises:
             HTTPException: Если аутентификация не удалась
         """
-        user = await self.authenticate_user(username, password)
+        user = await self.authenticate_user(email, password)
         if not user:
             raise ValueError("Неверный email или пароль")
             

@@ -91,6 +91,9 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     email: EmailStr | None = None
 
+class TokenRequest(BaseModel):
+    email: str
+    password: str
 
 class UserResponse(BaseModel):
     """Схема для ответа с данными пользователя."""

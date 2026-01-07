@@ -9,11 +9,7 @@ from pathlib import Path
 # Добавляем корень проекта в PYTHONPATH
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from search_place_app.di.container import Container, get_container, override_providers
+from search_place_app.di.container import Container, get_container
 
 # Экспортируем только необходимые сущности
-__all__ = [
-    'Container',
-    'get_container',
-    'override_providers',
-]
+__all__ = ['Container', 'container', 'get_container']

@@ -2,15 +2,19 @@ from fastapi import APIRouter, Request, Depends, HTTPException, status
 from loguru import logger
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
-from ..schema import CreateUser, Token, UserResponse
+from ..schema import CreateUser, Token, UserResponse, TokenRequest
 from ..services.auth_service import AuthService
 from typing import Annotated
 from ..models import User
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy import select
+
 from ..dependencies import (
     get_db,
     get_auth_service,
-    get_request_logger,
+    get_current_user,
 )
+from ..utils.request_logger import RequestLogger
 
 users_router = APIRouter(tags=["Пользователи"])
 
@@ -24,33 +28,31 @@ users_router = APIRouter(tags=["Пользователи"])
         status.HTTP_409_CONFLICT: {"description": "Пользователь с таким email уже существует"},
     },
 )
+@RequestLogger.log_request()
 async def register_user(
-        request: Request,
-        payload: CreateUser,
-        auth_service: AuthService = Depends(get_auth_service),
-        request_logger=Depends(get_request_logger),
-        db: AsyncSession = Depends(get_db)
-) -> UserResponse:
-    """
-    Регистрация нового пользователя.
-
-    - **email**: Email пользователя (должен быть уникальным)
-    - **password**: Пароль (минимум 8 символов)
-    - **full_name**: Полное имя пользователя
-    """
+    request: Request,
+    payload: CreateUser,
+    auth_service: AuthService = Depends(get_auth_service),
+    db: AsyncSession = Depends(get_db)
+):
     logger.info(f"Попытка регистрации пользователя: {payload.email}")
-    await request_logger.log_request(
-        request=request,
-        endpoint="POST /register",
-        method="POST",
-        payload=payload.model_dump()
-    )
-    password = auth_service.hash_password(payload.password)
-    try:
-        user = User(name=payload.name, email=payload.email, password=password)
-        await db.add(user)
 
-        # return UserResponse()
+    try:
+        user_data = payload.model_dump()
+        user_data['password'] = auth_service.hash_password(payload.password)
+        result = await db.execute(select(User).where(User.email == user_data["email"]))
+        existing = result.scalar_one_or_none()
+        if existing:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User with this email already exists")
+
+        user = User(**user_data)
+        db.add(user)
+        try:
+            await db.commit()
+        except IntegrityError:
+            await db.rollback()
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User with this email already exists")
+        await db.refresh(user)
 
         logger.info(f"Пользователь успешно зарегистрирован: {user.email}")
         return UserResponse(
@@ -59,6 +61,9 @@ async def register_user(
             email=user.email,
             is_active=user.is_active
         )
+
+
+
 
     except ValueError as e:
         logger.error(f"Ошибка при регистрации: {str(e)}")
@@ -75,11 +80,11 @@ async def register_user(
 
 
 @users_router.post("/token", response_model=Token)
+@RequestLogger.log_request()
 async def login_for_access_token(
         request: Request,
-        form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+        payload : TokenRequest,
         auth_service: AuthService = Depends(get_auth_service),
-        request_logger=Depends(get_request_logger)
 ) -> Token:
     """
     Аутентификация пользователя и получение JWT токена.
@@ -89,22 +94,14 @@ async def login_for_access_token(
 
     Возвращает access_token для аутентификации в API.
     """
-    await request_logger.log_request(
-        request=request,
-        endpoint="POST /token",
-        method="POST",
-        payload={"username": form_data.username}
-    )
-
     try:
-        token = await auth_service.authenticate_user(
-            email=form_data.username,
-            password=form_data.password
-        )
-        return Token(access_token=token, token_type="bearer")
+        token =  await auth_service.login_for_access_token(payload.email, payload.password)
+
+        return Token(access_token=token['access_token'], token_type=token['token_type'])
+
 
     except ValueError as e:
-        logger.warning(f"Ошибка аутентификации для пользователя {form_data.username}: {str(e)}")
+        logger.warning(f"Ошибка аутентификации для пользователя {payload.username}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Неверное имя пользователя или пароль",
@@ -112,3 +109,14 @@ async def login_for_access_token(
         )
 
 
+@users_router.get("/me")
+@RequestLogger.log_request()
+async def read_users_me(request: Request,
+                        # token: Token,
+                        user = Depends(get_current_user)
+):
+    user = UserResponse(id=user.id,
+                        name=user.name,
+                        email=user.email,)
+
+    return user

@@ -28,18 +28,11 @@ router_config = {
 }
 
 # Инициализация роутеров
-places_router = APIRouter(tags=["Места"], **router_config)
+
 
 hotel_router = APIRouter(tags=["Отели"], **router_config)
 
-# @places_router.post(
-#     '/placesadd/{search_info}',
-#     status_code=status.HTTP_200_OK,
-#     responses={
-#         status.HTTP_400_BAD_REQUEST: {"description": "Некорректные параметры запроса"},
-#         status.HTTP_404_NOT_FOUND: {"description": "Места не найдены"},
-#     }
-# )
+#
 # async def places_add(
 #     search_info: str,
 #     place_service: PlaceService = Depends(get_place_service),

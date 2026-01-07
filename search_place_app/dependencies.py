@@ -14,13 +14,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .config import settings
 from .database import SessionLocal
 from .models import User
+from .tools import validate_country_code
 
-from .di.container import container
+from .di import get_container
+from .services.auth_service import AuthService
+from sqlalchemy import select
+from loguru import logger
 
 # Аутентификация
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 oauth2_optional_scheme = OAuth2PasswordBearer(tokenUrl="token", auto_error=False)
 
+
+container = get_container()
 # Database
 async def get_db():
     """
@@ -75,7 +81,8 @@ async def get_current_user(
         detail="Не удалось проверить учетные данные",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    
+    if not token:
+        return None
     try:
         payload = jwt.decode(
             token, 
@@ -85,8 +92,11 @@ async def get_current_user(
         email = payload.get("sub")
         if email is None:
             raise credentials_exception
-            
-        user = await db.get(User, email)
+
+        result = await db.execute(select(User).where(User.email == email))
+        user = result.scalar_one_or_none()
+
+        # user = await db.get(User, email)
         if user is None:
             raise credentials_exception
             
@@ -114,16 +124,17 @@ async def get_optional_current_user(
         return None
         
     try:
-        payload = jwt.decode(
-            token, 
-            settings.SECRET_KEY, 
-            algorithms=[settings.ALGORITHM]
-        )
-        email = payload.get("sub")
-        if email is None:
-            return None
-            
-        return await db.get(User, email)
+        return await get_current_user(token, db)
+        # payload = jwt.decode(
+        #     token,
+        #     settings.SECRET_KEY,
+        #     algorithms=[settings.ALGORITHM]
+        # )
+        # email = payload.get("sub")
+        # if email is None:
+        #     return None
+        #
+        # return await db.get(User, email)
         
     except jwt.InvalidTokenError:
         return None
@@ -139,13 +150,10 @@ async def get_auth_service(
     Returns:
         AuthService: Сервис для работы с аутентификацией
     """
-    return container.auth_service()
+    return AuthService(db)
 
 
-async def get_place_service(
-    db: AsyncSession = Depends(get_db),
-    client: AsyncClient = Depends(get_http_client)
-):
+async def get_place_service():
     """
     Зависимость для получения сервиса работы с местами.
     
@@ -155,14 +163,14 @@ async def get_place_service(
     return container.place_service()
 
 
-async def get_hotel_service():
+async def get_hotel_service(db: AsyncSession = Depends(get_db)):
     """
     Зависимость для получения сервиса работы с отелями.
     
     Returns:
         HotelService: Сервис для работы с отелями
     """
-    return container.hotel_service()
+    return container.hotel_service(db=db)
 
 
 async def get_country_validator():
@@ -181,8 +189,10 @@ async def get_request_logger():
     
     Returns:
         RequestLogger: Логгер запросов
+
     """
-    return await container.async_request_logger()
+    logger = container.async_request_logger()
+    return logger
 
 
 async def get_cache_service():
@@ -225,7 +235,8 @@ async def get_amadeus_token(
         return response.json()['access_token']
         
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Не удалось получить токен доступа Amadeus"
-        ) from e
+        print(e)
+        # raise HTTPException(
+        #     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        #     detail=f"Не удалось получить токен доступа Amadeus"
+        # ) from e
